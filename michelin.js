@@ -13,45 +13,51 @@ function getAllURL(url){
   return listURL;
 }
 
-function getAllResto(listAllURL){
+
+async function getAllResto(listAllURL){
 
   var listAllResto = []
-  var listTemp = []
 
-  for (var i = 0; i < listAllURL.length; i ++){
-    axios.get(listAllURL[i]).then(function (response) {
+	for (var i = 0; i < listAllURL.length; i ++){
+	console.log("Page "+(i+1)+"/"+listAllURL.length)
+    await axios.get(listAllURL[i]).then(function (response) {
       const html = response.data
       const $ = cheerio.load(html)
-      var info = $('div .poi_card-display-title')
-
+      var info = $('.poi-search-result').find('a')
       info.each( (k, el) => {
-        var restoName = $(el).text();
-        restoName = restoName.replace(/\s\s+/g, '');
-		console.log(restoName)
-        listTemp[k]={restoName}
-		
+		var url="https://restaurant.michelin.fr"+$(el).attr('href')
+        var dataStar = $(el).find('.guide').find('span')
+		var name=$(el).find($('.poi_card-display-title')).text().trim()
+		var nbStar
+		if($(dataStar).hasClass('icon-cotation1etoile'))nbStar=1
+		else if($(dataStar).hasClass('icon-cotation2etoiles'))nbStar=2
+		else if($(dataStar).hasClass('icon-cotation3etoiles'))nbStar=3
+		listAllResto.push({name:name,url:url,nbStar:nbStar})
       })
-
-      for(var j = 0; j < listTemp.length; j ++){
-        listAllResto.push(listTemp[j])
-      }
-      var obj = {
-        listOfResto:[]
-      }
-
-      for (var i = 0; i < listAllResto.length; i ++){
-        obj.listOfResto.push(listAllResto[i])
-        var data = JSON.stringify(obj, null, 2)
-        fs.writeFileSync('listResto.json', data)
-      }
 
     })
     .catch(function (error) {
       console.log(error)
     })
+	
   }
+  return listAllResto
+}
+function writeObjInJSON(path,jsobject){
+	var data = JSON.stringify(jsobject)
+    fs.writeFileSync(path, data)
 }
 
+function getObjectFromJSON(jsonFile){
+    const file = fs.readFileSync(jsonFile)
+    const object = JSON.parse(file)
+    return object
+}
+//Step 1: Find all url pages of michelin starred restaurants
 const listAllURL = getAllURL(url)
-const res = getAllResto(listAllURL)
-module.exports = getAllResto
+//Step 2: Get all restaurants in scraping the michelin pages (thanks to urls) and write the restaurants in a json
+/*getAllResto(listAllURL).then(function(response){
+	writeObjInJSON("./JSON/MichelinRestaurants.json",response)
+})*/
+const restaurants=getObjectFromJSON("./JSON/MichelinRestaurants.json")
+module.exports.getRestaurants = restaurants
