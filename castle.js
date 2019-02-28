@@ -3,7 +3,6 @@ const rp = require('request-promise')
 const cheerio = require('cheerio')
 const fs = require('fs')
 const axios=require('axios')
-const urlCastle='https://www.relaischateaux.com/fr/site-map/etablissements'
 
 
 async function getHotelsNameAndUrl(urlRelaisAndChateau){
@@ -15,17 +14,12 @@ async function getHotelsNameAndUrl(urlRelaisAndChateau){
 		data.each(function(i,result){
 			const name=$(result).find('a').eq(0).text().trim()
 			const url=$(result).find('a').eq(0).attr('href')
-			const hotel={ "name": name, "url":url};			
+			const chef=$(result).find('a').eq(1).text().trim()
+			const hotel={ "name": name, "url":url,"chef":chef.replace(/Chef\s-\s/g,'')};			
 			listCastle.push(hotel)	
 		})		
 		return listCastle
     })		
-}
-
-function WriteHotelsNameAndUrlInJson(urlRelaisAndChateau,jsonFile){
-	getHotelsNameAndUrl(urlRelaisAndChateau).then(function(response){
-		fs.writeFileSync(jsonFile,JSON.stringify(response))
-	})
 }
 
 function getObjectFromJSON(jsonFile){
@@ -54,6 +48,7 @@ async function getHotelDetails(hotel){
             var result = {
                 name: hotel.name,
                 url: hotel.url,
+				chef:hotel.chef,
 				type: type,
                 price: $('.price').text().trim(),
 				postalCode: $('[itemprop="postalCode"]').first().text().replace(/\,/g, ''),
@@ -104,8 +99,8 @@ async function getHotels(hotels){
     }
 	return result;    
 }
-function writeHotelsInJSON(path,hotels){
-	var data = JSON.stringify(hotels)
+function writeObjInJSON(path,jsobject){
+	var data = JSON.stringify(jsobject)
     fs.writeFileSync(path, data)
 }
 function missingValuesCount(array){
@@ -145,28 +140,39 @@ async function getMissingHotels(hotels,hotelsUrlAndName){
 	}	
 	return hotels
 }
+function removeNonHotels(hotels){
+	for(let i=0;i<hotels.length;i++){
+		if (hotels[i].type.includes('Restaurant')) {
+			hotels.splice(i,1)
+			i--
+		}
+	}
+	return hotels
+}
+//For update the json, remove the '/**/' and launch: node castle.js (very long: we don't take advantage of async function and load each page one by one=>can be improve (see michelin.js))
+/*
 
-//First step: obtain hotels name and url which are available on https://www.relaischateaux.com/fr/site-map/etablissements
-//And stock them in a JSON file
-
-//WriteHotelsNameAndUrlInJson(urlCastle,"./JSON/R&C_url.json")
-
-//We can now get them with the JSON File
-
-const hotelsUrlAndName=getObjectFromJSON("./JSON/R&C_url.json")
-//console.log(hotelsUrlAndName)
-
+//First step: obtain hotels name and url which are available on https://www.relaischateaux.com/fr/site-map/etablissements and stock them in a JSON file
 //Second step: obtain full details about hotels thanks to the url obtain previously
 //As there may be errors in requesting relais&chateau, we create a function that verify all the properties are correctly loaded
+const urlCastle='https://www.relaischateaux.com/fr/site-map/etablissements'
 
-/*getHotels(hotelsUrlAndName).then(function(response){
-	getMissingHotels(response,hotelsUrlAndName).then(function(response){
-		//console.log(missingValuesCount(response))
-		writeHotelsInJSON("./JSON/R&C1.json",response)
+getHotelsNameAndUrl(urlCastle).then(function(response){
+	writeObjInJSON("./JSON/R&C_url.json",response)
+	var hotelsUrlAndName=response
+	getHotels(hotelsUrlAndName).then(function(response){
+		getMissingHotels(response,hotelsUrlAndName).then(function(response){
+			writeObjInJSON("./JSON/R&C.json",removeNonHotels(response))
+			console.log("\nHotels are now available in ./JSON/R&C.json")
+		})
 	})
-})*/
+})
+*/
 
-//We can now get them with the JSON File
-const hotels=getObjectFromJSON("./JSON/R&C1.json")
-//console.log(hotels)
+
+//We can now get the restaurants with the JSON File (faster but maybe not up to date)
+var hotels=getObjectFromJSON("./JSON/R&C.json")
+
+//console.log(hotels.length)
+
 module.exports.getProperties=hotels
